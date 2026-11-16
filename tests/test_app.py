@@ -1,9 +1,13 @@
 """Test de fumée de l'interface, avec l'agent remplacé par une fausse réponse."""
 
+from pathlib import Path
+
 from streamlit.testing.v1 import AppTest
 
 from src import agent
 from src.chain import Result
+
+APP_PATH = str(Path(__file__).resolve().parent.parent / "app.py")
 
 
 def test_app_shows_answer_sql_table_and_history(monkeypatch):
@@ -17,7 +21,7 @@ def test_app_shows_answer_sql_table_and_history(monkeypatch):
         )
 
     monkeypatch.setattr(agent, "ask", fake_ask)
-    app = AppTest.from_file("app.py").run()
+    app = AppTest.from_file(APP_PATH).run()
     assert not app.exception
 
     app.chat_input[0].set_value("Quels artistes ?").run()
@@ -34,7 +38,7 @@ def test_app_shows_error_when_agent_fails(monkeypatch):
         raise ConnectionError("Ollama injoignable")
 
     monkeypatch.setattr(agent, "ask", broken_ask)
-    app = AppTest.from_file("app.py").run()
+    app = AppTest.from_file(APP_PATH).run()
     app.chat_input[0].set_value("Une question").run()
     assert not app.exception
     assert "Ollama injoignable" in app.error[0].value
