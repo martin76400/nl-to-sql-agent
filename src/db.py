@@ -3,31 +3,48 @@
 Ce module ne connaît rien du LLM. Il fournit deux services au reste du projet :
 - get_schema() : une description courte de la base, à glisser dans le prompt ;
 - run_query()  : exécuter du SQL et rendre colonnes + lignes.
+
+run_query() est la SEULE porte d'entrée vers la base pour du SQL généré. Tous
+les garde-fous y sont donc appliqués, et aucun appelant ne peut les oublier.
 """
 
 import sqlite3
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from src import config
+from src import config, safety
+
+
+# Erreurs « normales » d'une requête générée : refus des garde-fous (ValueError),
+# SQL invalide, dépassement du temps imparti. L'agent les renvoie au modèle.
+QUERY_ERRORS = (safety.UnsafeQueryError, sqlite3.Error, TimeoutError)
 
 
 @dataclass
 class QueryResult:
-    """Résultat d'une requête : noms de colonnes et lignes."""
+    """Résultat d'une requête : noms de colonnes, lignes et SQL réellement exécuté."""
 
     columns: list[str]
     rows: list[tuple]
+    sql: str = ""  # la requête après garde-fous (avec son LIMIT éventuel)
 
 
 def connect(db_path: Path | str | None = None) -> sqlite3.Connection:
-    """Ouvre une connexion vers la base."""
-    path = Path(db_path or config.DB_PATH)
+    """Ouvre une connexion en LECTURE SEULE vers la base.
+
+    mode=ro est appliqué par SQLite lui-même : toute écriture échoue avec
+    « attempt to write a readonly database », quoi que contienne la requête.
+    C'est le garde-fou le plus solide, car il ne dépend pas de notre analyse
+    du SQL.
+    """
+    path = Path(db_path or config.DB_PATH).resolve()
     if not path.exists():
         raise FileNotFoundError(
             f"Base introuvable : {path}. Lance `python scripts/download_chinook.py`."
         )
-    return sqlite3.connect(path)
+    # as_uri() encode les espaces et caractères spéciaux du chemin.
+    return sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True)
 
 
 def _short_type(declared: str) -> str:
@@ -88,16 +105,36 @@ def get_schema(db_path: Path | str | None = None) -> str:
         conn.close()
 
 
-def run_query(sql: str, db_path: Path | str | None = None) -> QueryResult:
-    """Exécute une requête et renvoie colonnes + lignes.
+def run_query(
+    sql: str,
+    db_path: Path | str | None = None,
+    timeout_s: float | None = None,
+) -> QueryResult:
+    """Exécute une requête avec tous les garde-fous et renvoie colonnes + lignes.
 
-    Lève sqlite3.Error si le SQL est invalide : l'appelant décide quoi en faire
-    (l'agent, lui, renvoie le message d'erreur au modèle).
+    Erreurs possibles, que l'appelant peut renvoyer au modèle :
+    - safety.UnsafeQueryError : requête refusée avant exécution ;
+    - sqlite3.Error           : SQL invalide (table ou colonne inconnue, etc.) ;
+    - TimeoutError            : requête trop longue.
     """
+    sql = safety.make_safe(sql)
+    timeout_s = timeout_s or config.QUERY_TIMEOUT_S
+    deadline = time.monotonic() + timeout_s
+
     conn = connect(db_path)
+    # SQLite appelle ce handler toutes les 10 000 instructions de sa machine
+    # virtuelle. S'il renvoie True, la requête en cours est interrompue : c'est
+    # ce qui arrête une requête trop coûteuse (ex. produit cartésien géant).
+    conn.set_progress_handler(lambda: time.monotonic() > deadline, 10_000)
     try:
         cursor = conn.execute(sql)
         columns = [d[0] for d in cursor.description or []]
-        return QueryResult(columns=columns, rows=cursor.fetchall())
+        return QueryResult(columns=columns, rows=cursor.fetchall(), sql=sql)
+    except sqlite3.OperationalError as exc:
+        if time.monotonic() > deadline:
+            raise TimeoutError(
+                f"Query interrupted: it ran for more than {timeout_s:g} seconds."
+            ) from exc
+        raise
     finally:
         conn.close()
