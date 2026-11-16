@@ -10,7 +10,7 @@ Trois leviers compensent les faiblesses d'un petit modèle local :
 3. un prompt de correction qui renvoie au modèle sa requête et l'erreur obtenue.
 """
 
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 SQL_SYSTEM = """You are an expert SQLite analyst. Given a database schema and a \
 question, write ONE SQLite query that answers the question.
@@ -72,9 +72,23 @@ def _few_shot_messages() -> list[tuple[str, str]]:
     return messages
 
 
-# Prompt de génération : système (règles + schéma), exemples, puis la question.
+# Prompt de génération : système (règles + schéma), exemples, la question, puis
+# les éventuels essais ratés. "corrections" est vide au premier essai ; l'agent
+# y place ensuite chaque requête fautive suivie de son message d'erreur.
 SQL_PROMPT = ChatPromptTemplate.from_messages(
-    [("system", SQL_SYSTEM), *_few_shot_messages(), ("human", "{question}")]
+    [
+        ("system", SQL_SYSTEM),
+        *_few_shot_messages(),
+        ("human", "{question}"),
+        MessagesPlaceholder("corrections", optional=True),
+    ]
+)
+
+# Message renvoyé au modèle après un échec (voir agent.generate_sql).
+CORRECTION_TEMPLATE = (
+    "That query failed with this error:\n{error}\n\n"
+    "Check the table and column names against the schema, then fix the query. "
+    "Output ONLY the corrected SQL."
 )
 
 # Prompt de rédaction : transforme le résultat brut en phrase.
