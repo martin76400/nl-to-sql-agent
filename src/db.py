@@ -16,8 +16,8 @@ from pathlib import Path
 from src import config, safety
 
 
-# Erreurs « normales » d'une requête générée : refus des garde-fous (ValueError),
-# SQL invalide, dépassement du temps imparti. L'agent les renvoie au modèle.
+# Erreurs « normales » d'une requête générée : refus des garde-fous, SQL
+# invalide, dépassement du temps imparti.
 QUERY_ERRORS = (safety.UnsafeQueryError, sqlite3.Error, TimeoutError)
 
 
@@ -112,7 +112,7 @@ def run_query(
 ) -> QueryResult:
     """Exécute une requête avec tous les garde-fous et renvoie colonnes + lignes.
 
-    Erreurs possibles, que l'appelant peut renvoyer au modèle :
+    Erreurs possibles :
     - safety.UnsafeQueryError : requête refusée avant exécution ;
     - sqlite3.Error           : SQL invalide (table ou colonne inconnue, etc.) ;
     - TimeoutError            : requête trop longue.

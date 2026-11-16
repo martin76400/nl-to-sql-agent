@@ -6,6 +6,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_ollama import ChatOllama
 
 from src import config
+from src.prompts import CANNOT_ANSWER
 
 
 def get_llm() -> BaseChatModel:
@@ -33,10 +34,14 @@ def extract_sql(text: str) -> str:
     1. bloc ```sql ... ```  -> on garde l'intérieur du bloc ;
     2. texte avant la requête -> on démarre au premier SELECT ou WITH ;
     3. texte après la requête -> on coupe au premier point-virgule.
+    Si le modèle a répondu CANNOT_ANSWER (question hors périmètre), on renvoie
+    ce mot tel quel : l'agent sait l'interpréter.
 
     La coupe au point-virgule est volontairement naïve (elle ignore le cas d'un
     « ; » dans une chaîne de caractères). C'est suffisant ici.
     """
+    if CANNOT_ANSWER in text:
+        return CANNOT_ANSWER
     fenced = _FENCE.search(text)
     if fenced:
         text = fenced.group(1)

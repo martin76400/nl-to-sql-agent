@@ -62,15 +62,15 @@ def validate(sql: str) -> None:
     """Lève UnsafeQueryError si la requête n'est pas une lecture simple."""
     skeleton = _skeleton(sql).strip().rstrip(";").strip()
     if not skeleton:
-        raise UnsafeQueryError("Empty query.")
+        raise UnsafeQueryError("Requête vide.")
     if ";" in skeleton:
-        raise UnsafeQueryError("Only one SQL statement is allowed.")
+        raise UnsafeQueryError("Une seule instruction SQL est autorisée.")
     if not re.match(r"(SELECT|WITH)\b", skeleton, re.IGNORECASE):
-        raise UnsafeQueryError("Only SELECT queries are allowed.")
+        raise UnsafeQueryError("Seules les requêtes SELECT sont autorisées.")
     for keyword in FORBIDDEN_KEYWORDS:
         # \b = frontière de mot : UPDATE est interdit, la colonne LastUpdate non.
         if re.search(rf"\b{keyword}\b", skeleton, re.IGNORECASE):
-            raise UnsafeQueryError(f"Forbidden keyword: {keyword}. Read-only access.")
+            raise UnsafeQueryError(f"Mot-clé interdit : {keyword}. La base est en lecture seule.")
 
 
 def ensure_limit(sql: str, limit: int | None = None) -> str:
