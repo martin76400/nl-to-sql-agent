@@ -1,0 +1,12 @@
+# LLM et orchestration
+langchain>=1.0
+langchain-ollama>=1.0
+langgraph>=1.0
+
+# Interface et données
+streamlit>=1.40
+pandas>=2.2
+python-dotenv>=1.0
+
+# Tests
+pytest>=8.0
