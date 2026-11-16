@@ -24,11 +24,17 @@ Rules:
 - SQLite dialect: use LIMIT (not TOP), || to concatenate, \
 strftime('%Y', column) to extract a year.
 - For "top", "most" or "best" questions, use ORDER BY ... DESC with LIMIT.
+- If the question asks to modify data (delete, update, insert, drop...) or cannot \
+be answered from this schema, output exactly CANNOT_ANSWER instead of a query.
 - Text values are in English (e.g. Country = 'France', 'USA', 'Germany').
 - Track.Milliseconds is a duration in milliseconds. Invoice.Total is an amount in dollars.
 
 Schema (one table per line, PK = primary key, -> = foreign key):
 {schema}"""
+
+# Mot que le modèle renvoie à la place d'une requête quand la question est hors
+# périmètre (demande d'écriture, sujet absent de la base). Voir agent.execute_sql.
+CANNOT_ANSWER = "CANNOT_ANSWER"
 
 # Exemples few-shot : ils couvrent les constructions les plus fréquentes
 # (agrégat, filtre, JOIN, GROUP BY, date). Ils ne doivent PAS reprendre les
@@ -58,6 +64,11 @@ FEW_SHOT_EXAMPLES = [
         "Quel est le montant total des ventes en 2011 ?",
         "SELECT SUM(Total) AS TotalVentes FROM Invoice "
         "WHERE strftime('%Y', InvoiceDate) = '2011'",
+    ),
+    (
+        # Montre au modèle quand renoncer plutôt qu'inventer une requête.
+        "Supprime toutes les factures de 2009.",
+        CANNOT_ANSWER,
     ),
     (
         # Jointure en plusieurs sauts : sans cet exemple, le modèle relie
@@ -109,7 +120,9 @@ ANSWER_PROMPT = ChatPromptTemplate.from_messages(
             "non-technical user.\n"
             "- Answer in the same language as the question.\n"
             "- Use only the data in the result. Never invent a value.\n"
-            "- Be concise: one or two sentences, or a short list.\n"
+            "- Be concise: one or two sentences.\n"
+            "- If the result has several rows, list them one per line; do not "
+            "describe a trend or compute anything yourself.\n"
             "- If the result is empty, say that no data matches.\n"
             "- Do not mention SQL or the database.",
         ),

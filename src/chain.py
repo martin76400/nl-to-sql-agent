@@ -17,7 +17,7 @@ from langchain_core.runnables import Runnable, RunnableLambda
 
 from src import db
 from src.llm import extract_sql, get_llm
-from src.prompts import ANSWER_PROMPT, SQL_PROMPT
+from src.prompts import ANSWER_PROMPT, CANNOT_ANSWER, SQL_PROMPT
 
 # Nombre de lignes de résultat montrées au modèle pour rédiger la réponse.
 # Au-delà, le prompt grossit sans que la réponse s'améliore.
@@ -74,6 +74,9 @@ def run_chain(question: str, llm: BaseChatModel | None = None) -> Result:
     result.sql = build_sql_chain(llm).invoke(
         {"schema": db.get_schema(), "question": question}
     )
+    if result.sql == CANNOT_ANSWER:
+        result.sql, result.error = "", "Question hors périmètre de la base."
+        return result
     try:
         query_result = db.run_query(result.sql)
     except db.QUERY_ERRORS as exc:
