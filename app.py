@@ -29,7 +29,8 @@ def show_result(result: Result) -> None:
     else:
         st.markdown(result.answer)
 
-    if result.sql:
+    # En cas d'échec, les requêtes tentées sont listées plus bas (essais ratés).
+    if result.sql and not result.error:
         st.caption(f"SQL généré ({result.attempts} essai(s))")
         st.code(result.sql, language="sql")
 
