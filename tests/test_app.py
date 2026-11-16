@@ -8,6 +8,9 @@ from src import agent
 from src.chain import Result
 
 APP_PATH = str(Path(__file__).resolve().parent.parent / "app.py")
+# Le premier lancement importe Streamlit et pandas à froid : le délai par défaut
+# (3 s) peut alors être dépassé sur une machine lente.
+TIMEOUT_S = 30
 
 
 def test_app_shows_answer_sql_table_and_history(monkeypatch):
@@ -21,7 +24,7 @@ def test_app_shows_answer_sql_table_and_history(monkeypatch):
         )
 
     monkeypatch.setattr(agent, "ask", fake_ask)
-    app = AppTest.from_file(APP_PATH).run()
+    app = AppTest.from_file(APP_PATH, default_timeout=TIMEOUT_S).run()
     assert not app.exception
 
     app.chat_input[0].set_value("Quels artistes ?").run()
@@ -38,7 +41,7 @@ def test_app_shows_error_when_agent_fails(monkeypatch):
         raise ConnectionError("Ollama injoignable")
 
     monkeypatch.setattr(agent, "ask", broken_ask)
-    app = AppTest.from_file(APP_PATH).run()
+    app = AppTest.from_file(APP_PATH, default_timeout=TIMEOUT_S).run()
     app.chat_input[0].set_value("Une question").run()
     assert not app.exception
     assert "Ollama injoignable" in app.error[0].value
