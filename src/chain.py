@@ -36,6 +36,8 @@ class Result:
     answer: str = ""
     error: str = ""  # vide si tout s'est bien passé
     attempts: int = 1
+    # Essais ratés de l'agent : [{"sql": ..., "error": ...}, ...]
+    failures: list[dict] = field(default_factory=list)
 
 
 def build_sql_chain(llm: BaseChatModel) -> Runnable:
