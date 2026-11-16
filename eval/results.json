@@ -1,0 +1,143 @@
+{
+  "model": "qwen2.5-coder:7b",
+  "accuracy": 1.0,
+  "correct": 15,
+  "total": 15,
+  "details": [
+    {
+      "id": 1,
+      "level": "facile",
+      "question": "Combien y a-t-il d'artistes ?",
+      "correct": true,
+      "attempts": 1,
+      "generated_sql": "SELECT COUNT(*) AS NbArtistes FROM Artist\nLIMIT 200",
+      "error": ""
+    },
+    {
+      "id": 2,
+      "level": "facile",
+      "question": "Combien de clients habitent en France ?",
+      "correct": true,
+      "attempts": 1,
+      "generated_sql": "SELECT COUNT(*) AS NbClients FROM Customer WHERE Country = 'France'\nLIMIT 200",
+      "error": ""
+    },
+    {
+      "id": 3,
+      "level": "facile",
+      "question": "Quelle est la piste la plus longue ?",
+      "correct": true,
+      "attempts": 1,
+      "generated_sql": "SELECT Name, Milliseconds FROM Track ORDER BY Milliseconds DESC LIMIT 1",
+      "error": ""
+    },
+    {
+      "id": 4,
+      "level": "facile",
+      "question": "Quel est le montant moyen d'une facture ?",
+      "correct": true,
+      "attempts": 1,
+      "generated_sql": "SELECT AVG(Total) AS MontantMoyen FROM Invoice\nLIMIT 200",
+      "error": ""
+    },
+    {
+      "id": 5,
+      "level": "facile",
+      "question": "Combien de pistes durent plus de 5 minutes ?",
+      "correct": true,
+      "attempts": 1,
+      "generated_sql": "SELECT COUNT(*) FROM Track WHERE Milliseconds > 5 * 60 * 1000\nLIMIT 200",
+      "error": ""
+    },
+    {
+      "id": 6,
+      "level": "moyen",
+      "question": "Quels sont les albums du groupe AC/DC ?",
+      "correct": true,
+      "attempts": 1,
+      "generated_sql": "SELECT Album.Title FROM Album JOIN Artist ON Album.ArtistId = Artist.ArtistId WHERE Artist.Name = 'AC/DC'\nLIMIT 200",
+      "error": ""
+    },
+    {
+      "id": 7,
+      "level": "moyen",
+      "question": "Combien de pistes appartiennent au genre Jazz ?",
+      "correct": true,
+      "attempts": 1,
+      "generated_sql": "SELECT COUNT(*) FROM Track JOIN Genre ON Track.GenreId = Genre.GenreId WHERE Genre.Name = 'Jazz'\nLIMIT 200",
+      "error": ""
+    },
+    {
+      "id": 8,
+      "level": "moyen",
+      "question": "Quels sont les 2 pays qui ont le plus de factures ?",
+      "correct": true,
+      "attempts": 1,
+      "generated_sql": "SELECT BillingCountry, COUNT(*) AS NbFactures FROM Invoice GROUP BY BillingCountry ORDER BY NbFactures DESC LIMIT 2",
+      "error": ""
+    },
+    {
+      "id": 9,
+      "level": "moyen",
+      "question": "Quels sont les 3 artistes qui ont le plus d'albums ?",
+      "correct": true,
+      "attempts": 1,
+      "generated_sql": "SELECT Artist.Name, COUNT(*) AS NbAlbums FROM Artist JOIN Album ON Artist.ArtistId = Album.ArtistId GROUP BY Artist.ArtistId ORDER BY NbAlbums DESC LIMIT 3",
+      "error": ""
+    },
+    {
+      "id": 10,
+      "level": "moyen",
+      "question": "Quel est le chiffre d'affaires de chaque année ?",
+      "correct": true,
+      "attempts": 1,
+      "generated_sql": "SELECT strftime('%Y', InvoiceDate) AS Year, SUM(Total) AS TotalSales FROM Invoice GROUP BY Year\nLIMIT 200",
+      "error": ""
+    },
+    {
+      "id": 11,
+      "level": "difficile",
+      "question": "Quels pays comptent au moins 5 clients ?",
+      "correct": true,
+      "attempts": 1,
+      "generated_sql": "SELECT Country, COUNT(*) AS NbClients FROM Customer GROUP BY Country HAVING NbClients >= 5\nLIMIT 200",
+      "error": ""
+    },
+    {
+      "id": 12,
+      "level": "difficile",
+      "question": "Quels sont les noms de famille des 5 clients qui ont dépensé le plus ?",
+      "correct": true,
+      "attempts": 1,
+      "generated_sql": "SELECT Customer.LastName, SUM(Invoice.Total) AS TotalSpent FROM Invoice JOIN Customer ON Invoice.CustomerId = Customer.CustomerId GROUP BY Customer.CustomerId ORDER BY TotalSpent DESC LIMIT 5",
+      "error": ""
+    },
+    {
+      "id": 13,
+      "level": "difficile",
+      "question": "Pour chaque employé qui suit des clients, donne son nom de famille et le nombre de clients qu'il suit.",
+      "correct": true,
+      "attempts": 2,
+      "generated_sql": "SELECT Employee.LastName, COUNT(Customer.CustomerId) AS NbClients FROM Employee JOIN Customer ON Employee.EmployeeId = Customer.SupportRepId GROUP BY Employee.EmployeeId\nLIMIT 200",
+      "error": ""
+    },
+    {
+      "id": 14,
+      "level": "difficile",
+      "question": "Combien d'artistes n'ont aucun album ?",
+      "correct": true,
+      "attempts": 1,
+      "generated_sql": "SELECT COUNT(*) AS NbArtistesSansAlbum FROM Artist WHERE ArtistId NOT IN (SELECT ArtistId FROM Album)\nLIMIT 200",
+      "error": ""
+    },
+    {
+      "id": 15,
+      "level": "difficile",
+      "question": "Quel artiste a généré le plus de revenus ?",
+      "correct": true,
+      "attempts": 1,
+      "generated_sql": "SELECT Artist.Name, SUM(InvoiceLine.UnitPrice * InvoiceLine.Quantity) AS Revenus FROM InvoiceLine JOIN Track ON InvoiceLine.TrackId = Track.TrackId JOIN Album ON Track.AlbumId = Album.AlbumId JOIN Artist ON Album.ArtistId = Artist.ArtistId GROUP BY Artist.ArtistId ORDER BY Revenus DESC LIMIT 1",
+      "error": ""
+    }
+  ]
+}
