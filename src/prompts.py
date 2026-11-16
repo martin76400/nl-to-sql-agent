@@ -19,7 +19,7 @@ Rules:
 - Output ONLY the SQL query: no explanation, no markdown, no comment.
 - Write a single read-only SELECT statement (WITH ... SELECT is allowed).
 - Use only the tables and columns listed in the schema. Never invent a column.
-- Follow the foreign keys (->) to write JOINs.
+- Join two tables ONLY through a foreign key (->) listed in the schema. If two tables are not directly linked, go through the tables in between.
 - Select only the columns needed to answer the question.
 - SQLite dialect: use LIMIT (not TOP), || to concatenate, \
 strftime('%Y', column) to extract a year.
@@ -58,6 +58,15 @@ FEW_SHOT_EXAMPLES = [
         "Quel est le montant total des ventes en 2011 ?",
         "SELECT SUM(Total) AS TotalVentes FROM Invoice "
         "WHERE strftime('%Y', InvoiceDate) = '2011'",
+    ),
+    (
+        # Jointure en plusieurs sauts : sans cet exemple, le modèle relie
+        # volontiers deux tables qui n'ont aucune clé en commun.
+        "Which album has sold the most tracks?",
+        "SELECT Album.Title, SUM(InvoiceLine.Quantity) AS TracksSold FROM InvoiceLine "
+        "JOIN Track ON InvoiceLine.TrackId = Track.TrackId "
+        "JOIN Album ON Track.AlbumId = Album.AlbumId "
+        "GROUP BY Album.AlbumId ORDER BY TracksSold DESC LIMIT 1",
     ),
 ]
 
