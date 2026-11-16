@@ -8,7 +8,6 @@ Essai en ligne de commande :
     python -m src.chain "Combien y a-t-il d'artistes ?"
 """
 
-import sqlite3
 import sys
 from dataclasses import dataclass, field
 
@@ -77,10 +76,11 @@ def run_chain(question: str, llm: BaseChatModel | None = None) -> Result:
     )
     try:
         query_result = db.run_query(result.sql)
-    except sqlite3.Error as exc:
+    except db.QUERY_ERRORS as exc:
         result.error = str(exc)
         return result
 
+    result.sql = query_result.sql
     result.columns, result.rows = query_result.columns, query_result.rows
     result.answer = build_answer_chain(llm).invoke(
         {

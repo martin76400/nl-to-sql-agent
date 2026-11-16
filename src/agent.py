@@ -17,7 +17,6 @@ Essai en ligne de commande :
     python -m src.agent "Quels sont les 5 artistes avec le plus d'albums ?"
 """
 
-import sqlite3
 import sys
 from typing import TypedDict
 
@@ -76,14 +75,19 @@ def build_graph(llm: BaseChatModel, write_answer: bool = True):
         return {"sql": sql}
 
     def execute_sql(state: AgentState) -> dict:
+        # run_query applique les garde-fous (src/safety.py). Un refus est traité
+        # comme une erreur SQL : il est renvoyé au modèle, qui peut se corriger.
         try:
-            if not state["sql"]:
-                raise ValueError("The answer contained no SQL query.")
             result = db.run_query(state["sql"])
-        except (sqlite3.Error, ValueError) as exc:
+        except db.QUERY_ERRORS as exc:
             failure = {"sql": state["sql"], "error": str(exc)}
             return {"error": str(exc), "failures": state["failures"] + [failure]}
-        return {"error": "", "columns": result.columns, "rows": result.rows}
+        return {
+            "error": "",
+            "sql": result.sql,
+            "columns": result.columns,
+            "rows": result.rows,
+        }
 
     def answer(state: AgentState) -> dict:
         result = db.QueryResult(columns=state["columns"], rows=state["rows"])
