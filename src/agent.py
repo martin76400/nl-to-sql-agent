@@ -26,7 +26,13 @@ from langgraph.graph import END, START, StateGraph
 from src import config, db
 from src.chain import Result, build_answer_chain, build_sql_chain, format_result
 from src.llm import get_llm
-from src.prompts import CORRECTION_TEMPLATE
+from src.prompts import CANNOT_ANSWER, CORRECTION_TEMPLATE
+from src.safety import UnsafeQueryError
+
+OUT_OF_SCOPE_MESSAGE = (
+    "Cette question ne peut pas être traitée : elle demande une modification "
+    "ou des données absentes de la base."
+)
 
 
 class AgentState(TypedDict, total=False):
@@ -36,6 +42,7 @@ class AgentState(TypedDict, total=False):
     schema: str
     sql: str  # dernière requête générée
     error: str  # erreur de la dernière exécution ("" si succès)
+    give_up: bool  # True si réessayer n'a aucun sens (question hors périmètre)
     failures: list[dict]  # essais ratés : [{"sql": ..., "error": ...}, ...]
     columns: list[str]
     rows: list[tuple]
@@ -75,11 +82,23 @@ def build_graph(llm: BaseChatModel, write_answer: bool = True):
         return {"sql": sql}
 
     def execute_sql(state: AgentState) -> dict:
-        # run_query applique les garde-fous (src/safety.py). Un refus est traité
-        # comme une erreur SQL : il est renvoyé au modèle, qui peut se corriger.
+        # Le modèle a lui-même jugé la question hors périmètre.
+        if CANNOT_ANSWER in state["sql"]:
+            return {"error": OUT_OF_SCOPE_MESSAGE, "sql": "", "give_up": True}
         try:
             result = db.run_query(state["sql"])
+        except UnsafeQueryError as exc:
+            # Refus des garde-fous (src/safety.py) : on ne réessaie PAS. Si la
+            # question demande une écriture, un nouvel essai pousserait le
+            # modèle à inventer un SELECT sans rapport pour « réussir ».
+            failure = {"sql": state["sql"], "error": str(exc)}
+            return {
+                "error": str(exc),
+                "failures": state["failures"] + [failure],
+                "give_up": True,
+            }
         except db.QUERY_ERRORS as exc:
+            # Erreur SQL ou timeout : renvoyée au modèle pour correction.
             failure = {"sql": state["sql"], "error": str(exc)}
             return {"error": str(exc), "failures": state["failures"] + [failure]}
         return {
@@ -104,9 +123,9 @@ def build_graph(llm: BaseChatModel, write_answer: bool = True):
         """Décide de la suite après l'exécution : c'est le « cerveau » de la boucle."""
         if not state["error"]:
             return "answer" if write_answer else END
-        if len(state["failures"]) < config.MAX_ATTEMPTS:
-            return "generate_sql"
-        return END  # essais épuisés : on abandonne avec l'erreur
+        if state.get("give_up") or len(state["failures"]) >= config.MAX_ATTEMPTS:
+            return END  # hors périmètre ou essais épuisés : on rend l'erreur
+        return "generate_sql"
 
     graph = StateGraph(AgentState)
     graph.add_node("read_schema", read_schema)
@@ -138,7 +157,8 @@ def ask(
         rows=state.get("rows", []),
         answer=state.get("answer", ""),
         error=state.get("error", ""),
-        attempts=len(failures) + (1 if succeeded else 0),
+        # Essais = échecs + la tentative finale si elle a réussi.
+        attempts=max(1, len(failures) + (1 if succeeded else 0)),
         failures=failures,
     )
 
